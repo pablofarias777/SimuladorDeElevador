@@ -2,7 +2,9 @@ package com.elevator.view;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.GridLayout;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +20,9 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
+import javax.swing.JTextArea;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
@@ -27,6 +31,7 @@ import com.elevator.controller.ElevatorController;
 import com.elevator.model.Building;
 import com.elevator.model.Elevator;
 import com.elevator.model.Person;
+import com.elevator.model.SimulationConfig;
 
 public class ElevatorGUI extends JFrame {
     private Building building;
@@ -95,6 +100,18 @@ public class ElevatorGUI extends JFrame {
         JButton peakHourButton = new JButton("Alternar Horário de Pico");
         peakHourButton.addActionListener(e -> togglePeakHour());
         panel.add(peakHourButton);
+        panel.add(Box.createVerticalStrut(10));
+
+        // Botão para mostrar relatório
+        JButton reportButton = new JButton("Mostrar Relatório");
+        reportButton.addActionListener(e -> showReport());
+        panel.add(reportButton);
+        panel.add(Box.createVerticalStrut(10));
+
+        // Botão para configurações
+        JButton configButton = new JButton("Configurações");
+        configButton.addActionListener(e -> showConfigDialog());
+        panel.add(configButton);
         panel.add(Box.createVerticalStrut(10));
 
         // ComboBox para selecionar modelo de controle
@@ -203,6 +220,93 @@ public class ElevatorGUI extends JFrame {
         building.setPeakHour(!building.isPeakHour());
         JOptionPane.showMessageDialog(this, 
             "Horário de pico " + (building.isPeakHour() ? "ativado" : "desativado"));
+    }
+
+    private void showReport() {
+        String report = SimulationConfig.getInstance().generateReport();
+        JTextArea textArea = new JTextArea(report);
+        textArea.setEditable(false);
+        textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        scrollPane.setPreferredSize(new Dimension(400, 300));
+        
+        JOptionPane.showMessageDialog(this, scrollPane, "Relatório da Simulação", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void showConfigDialog() {
+        JDialog dialog = new JDialog(this, "Configurações da Simulação", true);
+        dialog.setLayout(new GridLayout(0, 2, 5, 5));
+        
+        SimulationConfig config = SimulationConfig.getInstance();
+        
+        // Tempos de deslocamento
+        JSpinner normalTravelSpinner = new JSpinner(new SpinnerNumberModel(
+            config.getTravelTimePerFloor(false) / 1000.0, 0.5, 10.0, 0.5));
+        JSpinner peakTravelSpinner = new JSpinner(new SpinnerNumberModel(
+            config.getTravelTimePerFloor(true) / 1000.0, 0.5, 10.0, 0.5));
+        
+        // Tempos de embarque
+        JSpinner normalBoardingSpinner = new JSpinner(new SpinnerNumberModel(
+            config.getBoardingTime(false) / 1000.0, 1.0, 10.0, 0.5));
+        JSpinner peakBoardingSpinner = new JSpinner(new SpinnerNumberModel(
+            config.getBoardingTime(true) / 1000.0, 1.0, 10.0, 0.5));
+        
+        // Consumo de energia
+        JSpinner baseEnergySpinner = new JSpinner(new SpinnerNumberModel(
+            config.getBaseEnergyPerFloor(), 0.01, 1.0, 0.01));
+        JSpinner passengerEnergySpinner = new JSpinner(new SpinnerNumberModel(
+            config.getPassengerEnergyFactor(), 0.01, 1.0, 0.01));
+        
+        // Adiciona os campos ao diálogo
+        dialog.add(new JLabel("Tempo de Deslocamento (Normal):"));
+        dialog.add(normalTravelSpinner);
+        dialog.add(new JLabel("Tempo de Deslocamento (Pico):"));
+        dialog.add(peakTravelSpinner);
+        dialog.add(new JLabel("Tempo de Embarque (Normal):"));
+        dialog.add(normalBoardingSpinner);
+        dialog.add(new JLabel("Tempo de Embarque (Pico):"));
+        dialog.add(peakBoardingSpinner);
+        dialog.add(new JLabel("Consumo Base por Andar (kWh):"));
+        dialog.add(baseEnergySpinner);
+        dialog.add(new JLabel("Fator de Consumo por Passageiro:"));
+        dialog.add(passengerEnergySpinner);
+        
+        // Botões de ação
+        JPanel buttonPanel = new JPanel();
+        JButton saveButton = new JButton("Salvar");
+        JButton cancelButton = new JButton("Cancelar");
+        
+        saveButton.addActionListener(e -> {
+            // Atualiza os valores
+            config.setTravelTimePerFloor(
+                (int)((Double)normalTravelSpinner.getValue() * 1000),
+                (int)((Double)peakTravelSpinner.getValue() * 1000)
+            );
+            config.setBoardingTime(
+                (int)((Double)normalBoardingSpinner.getValue() * 1000),
+                (int)((Double)peakBoardingSpinner.getValue() * 1000)
+            );
+            config.setBaseEnergyPerFloor((Double)baseEnergySpinner.getValue());
+            config.setPassengerEnergyFactor((Double)passengerEnergySpinner.getValue());
+            
+            JOptionPane.showMessageDialog(dialog,
+                "Configurações salvas com sucesso!",
+                "Sucesso",
+                JOptionPane.INFORMATION_MESSAGE);
+            dialog.dispose();
+        });
+        
+        cancelButton.addActionListener(e -> dialog.dispose());
+        
+        buttonPanel.add(saveButton);
+        buttonPanel.add(cancelButton);
+        
+        dialog.add(buttonPanel);
+        
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
     }
 
     private void updateElevatorPanels() {

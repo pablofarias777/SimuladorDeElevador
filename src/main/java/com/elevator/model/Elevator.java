@@ -10,7 +10,7 @@ public class Elevator {
     private List<Person> passengers;
     private boolean isMoving;
     private Direction direction;
-    private double energyConsumption;
+    private SimulationConfig config;
 
     public enum Direction {
         UP, DOWN, IDLE
@@ -23,7 +23,7 @@ public class Elevator {
         this.passengers = new ArrayList<>();
         this.isMoving = false;
         this.direction = Direction.IDLE;
-        this.energyConsumption = 0.0;
+        this.config = SimulationConfig.getInstance();
     }
 
     public int getId() {
@@ -65,6 +65,7 @@ public class Elevator {
     public void addPassenger(Person person) {
         if (!isFull()) {
             passengers.add(person);
+            config.incrementPassengersServed();
         }
     }
 
@@ -80,28 +81,33 @@ public class Elevator {
         return new ArrayList<>(passengers);
     }
 
-    public void move(int targetFloor) {
-        if (targetFloor > currentFloor) {
-            direction = Direction.UP;
-        } else if (targetFloor < currentFloor) {
-            direction = Direction.DOWN;
-        } else {
-            direction = Direction.IDLE;
+    public void move(int nextFloor) {
+        int distance = Math.abs(nextFloor - currentFloor);
+        if (distance > 0) {
+            // Atualiza métricas
+            config.addFloorsTraveled(distance);
+            config.addTravelTime(distance * config.getTravelTimePerFloor(false)); // TODO: passar isPeakHour
+            
+            // Atualiza direção
+            if (nextFloor > currentFloor) {
+                direction = Direction.UP;
+            } else if (nextFloor < currentFloor) {
+                direction = Direction.DOWN;
+            }
+            
+            // Atualiza posição
+            currentFloor = nextFloor;
+            
+            // Calcula e adiciona consumo de energia
+            double energyCost = calculateEnergyCost(distance);
+            config.addEnergyConsumption(energyCost);
         }
-        
-        currentFloor = targetFloor;
-        updateEnergyConsumption();
     }
 
-    private void updateEnergyConsumption() {
-        // Simples cálculo de consumo de energia baseado no movimento
-        double baseConsumption = 0.1; // kWh por andar
-        double passengerFactor = 1.0 + (passengers.size() * 0.1); // Aumenta o consumo com mais passageiros
-        energyConsumption += baseConsumption * passengerFactor;
-    }
-
-    public double getEnergyConsumption() {
-        return energyConsumption;
+    private double calculateEnergyCost(int distance) {
+        double baseCost = distance * config.getBaseEnergyPerFloor();
+        double passengerFactor = 1.0 + (passengers.size() * config.getPassengerEnergyFactor());
+        return baseCost * passengerFactor;
     }
 
     @Override
