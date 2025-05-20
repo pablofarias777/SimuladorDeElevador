@@ -66,14 +66,15 @@ public class ElevatorController {
             return;
         }
         
+        // Inicia o movimento de todos os elevadores parados
         for (Elevator elevator : elevators) {
-            // Se o elevador não está se movendo, determina um novo destino
             if (!elevator.isMoving()) {
                 int targetFloor = determineTargetFloor(elevator);
                 if (targetFloor != elevator.getCurrentFloor()) {
                     elevatorTargetFloors.put(elevator, targetFloor);
                     elevator.setMoving(true);
-                    System.out.println("Elevador " + elevator.getId() + " iniciou movimento para andar " + targetFloor);
+                    System.out.println("Elevador " + elevator.getId() + " iniciou movimento para andar " + targetFloor + 
+                        " (Modelo: " + currentModel + ")");
                 }
             }
         }
@@ -131,17 +132,6 @@ public class ElevatorController {
                 elevator.move(nextFloor);
                 System.out.println("Elevador " + elevator.getId() + " movido para andar " + nextFloor + 
                     " (destino final: " + targetFloor + ", Modelo: " + currentModel + ")");
-            } else {
-                // Se o elevador não está se movendo, verifica se há pessoas esperando
-                if (hasWaitingPeople()) {
-                    int targetFloor = determineTargetFloor(elevator);
-                    if (targetFloor != elevator.getCurrentFloor()) {
-                        elevatorTargetFloors.put(elevator, targetFloor);
-                        elevator.setMoving(true);
-                        System.out.println("Elevador " + elevator.getId() + " iniciou movimento para andar " + targetFloor + 
-                            " (Modelo: " + currentModel + ")");
-                    }
-                }
             }
         }
     }

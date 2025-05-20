@@ -192,8 +192,9 @@ public class ElevatorGUI extends JFrame {
         
         // Feedback visual
         JOptionPane.showMessageDialog(this, 
-            "Processando requisições...\n" +
-            "Pessoas aguardando: " + building.getTotalWaitingPeople(),
+            "Iniciando processamento das requisições...\n" +
+            "Pessoas aguardando: " + building.getTotalWaitingPeople() + "\n" +
+            "Modelo de controle: " + controller.getCurrentModel(),
             "Status",
             JOptionPane.INFORMATION_MESSAGE);
     }
