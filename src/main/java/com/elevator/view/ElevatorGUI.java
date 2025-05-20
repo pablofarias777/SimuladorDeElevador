@@ -54,7 +54,17 @@ public class ElevatorGUI extends JFrame {
         setTitle("Simulador de Elevador Inteligente");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
+
+        // Configura o tamanho mínimo da janela antes de inicializar os componentes
+        setMinimumSize(new Dimension(800, 600));
+
+        // Inicializa os componentes
         initializeComponents();
+
+        // Força a atualização do layout
+        revalidate();
+        repaint();
+
         pack();
         setLocationRelativeTo(null);
         startSimulation();
@@ -63,6 +73,7 @@ public class ElevatorGUI extends JFrame {
     private void initializeComponents() {
         // Painel principal dos elevadores
         JPanel elevatorPanel = new JPanel(new GridLayout(1, building.getElevators().size(), 10, 0));
+        elevatorPanel.setName("elevatorPanel");
         elevatorPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         elevatorPanel.setBackground(new Color(240, 240, 240));
 
@@ -87,8 +98,8 @@ public class ElevatorGUI extends JFrame {
         add(statusPanel, BorderLayout.SOUTH);
         add(externalPanelConfig, BorderLayout.WEST);
 
-        // Configura o tamanho mínimo da janela
-        setMinimumSize(new Dimension(800, 600));
+        // Atualiza os painéis externos
+        updateExternalPanels(ExternalPanel.PanelType.BOTAO_UNICO);
     }
 
     private JPanel createControlPanel() {
@@ -389,6 +400,10 @@ public class ElevatorGUI extends JFrame {
                 
                 // Atualiza o painel de status
                 updateStatusPanel();
+                
+                // Força a atualização do layout
+                revalidate();
+                repaint();
             }
             
             // Atualiza as configurações de tempo e energia
@@ -429,8 +444,16 @@ public class ElevatorGUI extends JFrame {
         }
         elevatorPanels.clear();
         
+        // Remove o painel de elevadores antigo
+        for (Component comp : getContentPane().getComponents()) {
+            if (comp instanceof JPanel && comp.getName() != null && comp.getName().equals("elevatorPanel")) {
+                getContentPane().remove(comp);
+            }
+        }
+        
         // Cria novos painéis
         JPanel elevatorPanel = new JPanel(new GridLayout(1, building.getElevators().size(), 10, 0));
+        elevatorPanel.setName("elevatorPanel");
         elevatorPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         elevatorPanel.setBackground(new Color(240, 240, 240));
         
@@ -450,6 +473,7 @@ public class ElevatorGUI extends JFrame {
         JPanel externalPanelConfig = createExternalPanelConfig();
         add(externalPanelConfig, BorderLayout.WEST);
         
+        // Força a atualização do layout
         revalidate();
         repaint();
     }
@@ -580,7 +604,7 @@ public class ElevatorGUI extends JFrame {
         return panel;
     }
 
-    private void updateExternalPanels(ExternalPanel.PanelType type) {
+    public void updateExternalPanels(ExternalPanel.PanelType type) {
         // Remove os painéis externos existentes
         for (Component comp : getContentPane().getComponents()) {
             if (comp instanceof JPanel && comp.getName() != null && comp.getName().equals("externalPanels")) {
@@ -621,37 +645,77 @@ public class ElevatorGUI extends JFrame {
         SwingUtilities.invokeLater(() -> {
             // Configuração inicial
             JDialog configDialog = new JDialog((Frame)null, "Configuração Inicial", true);
-            configDialog.setLayout(new GridLayout(0, 2, 5, 5));
+            configDialog.setLayout(new BorderLayout());
             
-            JSpinner floorsSpinner = new JSpinner(new SpinnerNumberModel(10, 5, 50, 1));
-            JSpinner elevatorsSpinner = new JSpinner(new SpinnerNumberModel(2, 1, 10, 1));
-            JSpinner capacitySpinner = new JSpinner(new SpinnerNumberModel(8, 1, 20, 1));
+            // Valores padrão
+            int defaultFloors = 10;
+            int defaultElevators = 2;
+            int defaultCapacity = 8;
+            ExternalPanel.PanelType defaultPanelType = ExternalPanel.PanelType.BOTAO_UNICO;
             
-            configDialog.add(new JLabel("Número de Andares:"));
-            configDialog.add(floorsSpinner);
-            configDialog.add(new JLabel("Número de Elevadores:"));
-            configDialog.add(elevatorsSpinner);
-            configDialog.add(new JLabel("Capacidade dos Elevadores:"));
-            configDialog.add(capacitySpinner);
+            JSpinner floorsSpinner = new JSpinner(new SpinnerNumberModel(defaultFloors, 5, 50, 1));
+            JSpinner elevatorsSpinner = new JSpinner(new SpinnerNumberModel(defaultElevators, 1, 10, 1));
+            JSpinner capacitySpinner = new JSpinner(new SpinnerNumberModel(defaultCapacity, 1, 20, 1));
+            JComboBox<ExternalPanel.PanelType> panelTypeComboBox = new JComboBox<>(ExternalPanel.PanelType.values());
+            panelTypeComboBox.setSelectedItem(defaultPanelType);
             
+            // Configuração dos spinners e combo box
+            floorsSpinner.setPreferredSize(new Dimension(100, 25));
+            elevatorsSpinner.setPreferredSize(new Dimension(100, 25));
+            capacitySpinner.setPreferredSize(new Dimension(100, 25));
+            panelTypeComboBox.setPreferredSize(new Dimension(150, 25));
+            
+            // Adiciona os componentes ao diálogo
+            JPanel contentPanel = new JPanel(new GridLayout(0, 2, 10, 10));
+            contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            
+            contentPanel.add(new JLabel("Número de Andares:"));
+            contentPanel.add(floorsSpinner);
+            contentPanel.add(new JLabel("Número de Elevadores:"));
+            contentPanel.add(elevatorsSpinner);
+            contentPanel.add(new JLabel("Capacidade dos Elevadores:"));
+            contentPanel.add(capacitySpinner);
+            contentPanel.add(new JLabel("Tipo de Painel Externo:"));
+            contentPanel.add(panelTypeComboBox);
+            
+            configDialog.add(contentPanel, BorderLayout.CENTER);
+            
+            // Painel de botões
+            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
             JButton startButton = new JButton("Iniciar Simulação");
             startButton.addActionListener(e -> {
                 int floors = (Integer)floorsSpinner.getValue();
                 int elevators = (Integer)elevatorsSpinner.getValue();
                 int capacity = (Integer)capacitySpinner.getValue();
+                ExternalPanel.PanelType panelType = (ExternalPanel.PanelType)panelTypeComboBox.getSelectedItem();
                 
+                // Cria o prédio com as configurações iniciais
                 Building building = new Building(floors, elevators, capacity);
+                
+                // Cria o controlador com o modelo padrão
                 ElevatorController controller = new ElevatorController(
                     building, 
                     ElevatorController.ControlModel.PRIMEIRO_A_CHEGAR
                 );
-                new ElevatorGUI(building, controller).setVisible(true);
+                
+                // Cria e mostra a interface principal
+                ElevatorGUI gui = new ElevatorGUI(building, controller);
+                gui.setVisible(true);
+                
+                // Atualiza o tipo de painel externo
+                gui.updateExternalPanels(panelType);
+                
                 configDialog.dispose();
             });
             
-            configDialog.add(startButton);
+            buttonPanel.add(startButton);
+            configDialog.add(buttonPanel, BorderLayout.SOUTH);
+            
+            // Configura o diálogo
+            configDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
             configDialog.pack();
             configDialog.setLocationRelativeTo(null);
+            configDialog.setResizable(false);
             configDialog.setVisible(true);
         });
     }
