@@ -62,6 +62,10 @@ public class Elevator {
         return passengers.isEmpty();
     }
 
+    public int getCapacity() {
+        return capacity;
+    }
+
     public void addPassenger(Person person) {
         if (!isFull()) {
             passengers.add(person);

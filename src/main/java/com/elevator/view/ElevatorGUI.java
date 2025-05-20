@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.Frame;
 import java.awt.GridLayout;
 import java.util.ArrayList;
 import java.util.List;
@@ -240,6 +241,14 @@ public class ElevatorGUI extends JFrame {
         
         SimulationConfig config = SimulationConfig.getInstance();
         
+        // Configurações do prédio
+        JSpinner floorsSpinner = new JSpinner(new SpinnerNumberModel(
+            building.getNumberOfFloors(), 5, 50, 1));
+        JSpinner elevatorsSpinner = new JSpinner(new SpinnerNumberModel(
+            building.getElevators().size(), 1, 10, 1));
+        JSpinner capacitySpinner = new JSpinner(new SpinnerNumberModel(
+            building.getElevators().get(0).getCapacity(), 1, 20, 1));
+        
         // Tempos de deslocamento
         JSpinner normalTravelSpinner = new JSpinner(new SpinnerNumberModel(
             config.getTravelTimePerFloor(false) / 1000.0, 0.5, 10.0, 0.5));
@@ -259,6 +268,12 @@ public class ElevatorGUI extends JFrame {
             config.getPassengerEnergyFactor(), 0.01, 1.0, 0.01));
         
         // Adiciona os campos ao diálogo
+        dialog.add(new JLabel("Número de Andares:"));
+        dialog.add(floorsSpinner);
+        dialog.add(new JLabel("Número de Elevadores:"));
+        dialog.add(elevatorsSpinner);
+        dialog.add(new JLabel("Capacidade dos Elevadores:"));
+        dialog.add(capacitySpinner);
         dialog.add(new JLabel("Tempo de Deslocamento (Normal):"));
         dialog.add(normalTravelSpinner);
         dialog.add(new JLabel("Tempo de Deslocamento (Pico):"));
@@ -279,6 +294,28 @@ public class ElevatorGUI extends JFrame {
         
         saveButton.addActionListener(e -> {
             // Atualiza os valores
+            int newFloors = (Integer)floorsSpinner.getValue();
+            int newElevators = (Integer)elevatorsSpinner.getValue();
+            int newCapacity = (Integer)capacitySpinner.getValue();
+            
+            // Verifica se houve mudança na estrutura do prédio
+            if (newFloors != building.getNumberOfFloors() || 
+                newElevators != building.getElevators().size() ||
+                newCapacity != building.getElevators().get(0).getCapacity()) {
+                
+                // Cria novo prédio com as configurações atualizadas
+                Building newBuilding = new Building(newFloors, newElevators, newCapacity);
+                newBuilding.setPeakHour(building.isPeakHour());
+                
+                // Atualiza o prédio e o controlador
+                this.building = newBuilding;
+                this.controller = new ElevatorController(newBuilding, controller.getCurrentModel());
+                
+                // Recria os painéis dos elevadores
+                recreateElevatorPanels();
+            }
+            
+            // Atualiza as configurações de tempo e energia
             config.setTravelTimePerFloor(
                 (int)((Double)normalTravelSpinner.getValue() * 1000),
                 (int)((Double)peakTravelSpinner.getValue() * 1000)
@@ -307,6 +344,29 @@ public class ElevatorGUI extends JFrame {
         dialog.pack();
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
+    }
+
+    private void recreateElevatorPanels() {
+        // Remove os painéis antigos
+        for (ElevatorPanel panel : elevatorPanels) {
+            remove(panel);
+        }
+        elevatorPanels.clear();
+        
+        // Cria novos painéis
+        JPanel elevatorPanel = new JPanel(new GridLayout(1, building.getElevators().size(), 10, 0));
+        elevatorPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        for (Elevator elevator : building.getElevators()) {
+            ElevatorPanel panel = new ElevatorPanel(elevator, building.getNumberOfFloors());
+            elevatorPanels.add(panel);
+            elevatorPanel.add(panel);
+        }
+        
+        // Atualiza o layout
+        add(elevatorPanel, BorderLayout.CENTER);
+        revalidate();
+        repaint();
     }
 
     private void updateElevatorPanels() {
@@ -372,12 +432,40 @@ public class ElevatorGUI extends JFrame {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            Building building = new Building(10, 2, 8); // 10 andares, 2 elevadores, capacidade 8
-            ElevatorController controller = new ElevatorController(
-                building, 
-                ElevatorController.ControlModel.PRIMEIRO_A_CHEGAR
-            );
-            new ElevatorGUI(building, controller).setVisible(true);
+            // Configuração inicial
+            JDialog configDialog = new JDialog((Frame)null, "Configuração Inicial", true);
+            configDialog.setLayout(new GridLayout(0, 2, 5, 5));
+            
+            JSpinner floorsSpinner = new JSpinner(new SpinnerNumberModel(10, 5, 50, 1));
+            JSpinner elevatorsSpinner = new JSpinner(new SpinnerNumberModel(2, 1, 10, 1));
+            JSpinner capacitySpinner = new JSpinner(new SpinnerNumberModel(8, 1, 20, 1));
+            
+            configDialog.add(new JLabel("Número de Andares:"));
+            configDialog.add(floorsSpinner);
+            configDialog.add(new JLabel("Número de Elevadores:"));
+            configDialog.add(elevatorsSpinner);
+            configDialog.add(new JLabel("Capacidade dos Elevadores:"));
+            configDialog.add(capacitySpinner);
+            
+            JButton startButton = new JButton("Iniciar Simulação");
+            startButton.addActionListener(e -> {
+                int floors = (Integer)floorsSpinner.getValue();
+                int elevators = (Integer)elevatorsSpinner.getValue();
+                int capacity = (Integer)capacitySpinner.getValue();
+                
+                Building building = new Building(floors, elevators, capacity);
+                ElevatorController controller = new ElevatorController(
+                    building, 
+                    ElevatorController.ControlModel.PRIMEIRO_A_CHEGAR
+                );
+                new ElevatorGUI(building, controller).setVisible(true);
+                configDialog.dispose();
+            });
+            
+            configDialog.add(startButton);
+            configDialog.pack();
+            configDialog.setLocationRelativeTo(null);
+            configDialog.setVisible(true);
         });
     }
 } 
