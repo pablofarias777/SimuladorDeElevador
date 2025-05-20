@@ -1,15 +1,14 @@
 package com.elevator.controller;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
 import com.elevator.model.Building;
 import com.elevator.model.Elevator;
+import com.elevator.model.MyList;
+import com.elevator.model.MyQueue;
 import com.elevator.model.Person;
-import com.elevator.model.WaitingQueue;
 
 public class ElevatorController {
     public enum ControlModel {
@@ -58,7 +57,7 @@ public class ElevatorController {
     }
 
     public void processElevatorRequests() {
-        List<Elevator> elevators = building.getElevators();
+        MyList<Elevator> elevators = building.getElevators();
         
         // Verifica se há pessoas esperando
         if (!hasWaitingPeople()) {
@@ -87,7 +86,7 @@ public class ElevatorController {
                 int targetFloor = elevatorTargetFloors.get(elevator);
                 
                 // Verifica se há passageiros que precisam descer neste andar
-                List<Person> passengersToRemove = new ArrayList<>();
+                MyList<Person> passengersToRemove = new MyList<>();
                 for (Person passenger : elevator.getPassengers()) {
                     if (passenger.getDestinationFloor() == currentFloor) {
                         passengersToRemove.add(passenger);
@@ -193,7 +192,7 @@ public class ElevatorController {
         int minDistance = Integer.MAX_VALUE;
 
         for (int i = 1; i <= building.getNumberOfFloors(); i++) {
-            WaitingQueue queue = building.getFloorQueue(i);
+            MyQueue<Person> queue = building.getFloorQueue(i);
             if (!queue.isEmpty()) {
                 int distance = Math.abs(i - currentFloor);
                 if (distance < minDistance) {
@@ -214,7 +213,7 @@ public class ElevatorController {
 
         // Calcula o tempo médio de espera para cada andar
         for (int i = 1; i <= building.getNumberOfFloors(); i++) {
-            WaitingQueue queue = building.getFloorQueue(i);
+            MyQueue<Person> queue = building.getFloorQueue(i);
             if (!queue.isEmpty()) {
                 long totalWaitTime = 0;
                 int personCount = 0;
@@ -252,7 +251,7 @@ public class ElevatorController {
         double minEnergyCost = Double.MAX_VALUE;
 
         for (int i = 1; i <= building.getNumberOfFloors(); i++) {
-            WaitingQueue queue = building.getFloorQueue(i);
+            MyQueue<Person> queue = building.getFloorQueue(i);
             if (!queue.isEmpty()) {
                 // Calcula o custo de energia considerando vários fatores
                 double energyCost = calculateEnergyCost(elevator, i);
@@ -303,7 +302,7 @@ public class ElevatorController {
     }
 
     private void processFloorQueue(Elevator elevator, int floor) {
-        WaitingQueue queue = building.getFloorQueue(floor);
+        MyQueue<Person> queue = building.getFloorQueue(floor);
         while (!queue.isEmpty() && !elevator.isFull()) {
             Person person = queue.dequeue();
             if (person != null) {
@@ -328,7 +327,7 @@ public class ElevatorController {
 
     private boolean hasWaitingPeople() {
         for (int i = 1; i <= building.getNumberOfFloors(); i++) {
-            WaitingQueue queue = building.getFloorQueue(i);
+            MyQueue<Person> queue = building.getFloorQueue(i);
             if (!queue.isEmpty()) {
                 System.out.println("Pessoas esperando no andar " + i + ": " + queue.size());
                 return true;

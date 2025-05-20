@@ -1,13 +1,15 @@
 package com.elevator.model;
 
-import java.util.ArrayList;
-import java.util.List;
 
 public class Elevator {
-    private int id;
+    private final int id;
+    private final int capacity;
     private int currentFloor;
-    private int capacity;
-    private List<Person> passengers;
+    private MyList<Integer> destinations;
+    private boolean priorityMode;
+    private String status;
+    private Building building;
+    private MyList<Person> passengers;
     private boolean isMoving;
     private Direction direction;
     private SimulationConfig config;
@@ -18,12 +20,23 @@ public class Elevator {
 
     public Elevator(int id, int capacity) {
         this.id = id;
-        this.currentFloor = 1;
         this.capacity = capacity;
-        this.passengers = new ArrayList<>();
+        this.currentFloor = 1;
+        this.destinations = new MyList<>();
+        this.priorityMode = false;
+        this.status = "Parado";
+        this.passengers = new MyList<>();
         this.isMoving = false;
         this.direction = Direction.IDLE;
         this.config = SimulationConfig.getInstance();
+    }
+
+    public void setBuilding(Building building) {
+        this.building = building;
+    }
+
+    public Building getBuilding() {
+        return building;
     }
 
     public int getId() {
@@ -34,8 +47,46 @@ public class Elevator {
         return currentFloor;
     }
 
-    public void setCurrentFloor(int currentFloor) {
-        this.currentFloor = currentFloor;
+    public void setCurrentFloor(int floor) {
+        this.currentFloor = floor;
+    }
+
+    public MyList<Integer> getDestinations() {
+        MyList<Integer> copy = new MyList<>();
+        for (Integer dest : destinations) {
+            copy.add(dest);
+        }
+        return copy;
+    }
+
+    public void addDestination(int floor) {
+        if (!destinations.contains(floor)) {
+            destinations.add(floor);
+        }
+    }
+
+    public void removeDestination(int floor) {
+        destinations.remove(Integer.valueOf(floor));
+    }
+
+    public boolean isPriorityMode() {
+        return priorityMode;
+    }
+
+    public void togglePriorityMode() {
+        this.priorityMode = !this.priorityMode;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public int getCapacity() {
+        return capacity;
     }
 
     public boolean isMoving() {
@@ -62,10 +113,6 @@ public class Elevator {
         return passengers.isEmpty();
     }
 
-    public int getCapacity() {
-        return capacity;
-    }
-
     public void addPassenger(Person person) {
         if (!isFull()) {
             passengers.add(person);
@@ -77,12 +124,18 @@ public class Elevator {
         passengers.remove(person);
     }
 
-    public void removePassengers(List<Person> passengers) {
-        this.passengers.removeAll(passengers);
+    public void removePassengers(MyList<Person> passengersToRemove) {
+        for (Person person : passengersToRemove) {
+            passengers.remove(person);
+        }
     }
 
-    public List<Person> getPassengers() {
-        return new ArrayList<>(passengers);
+    public MyList<Person> getPassengers() {
+        MyList<Person> copy = new MyList<>();
+        for (Person passenger : passengers) {
+            copy.add(passenger);
+        }
+        return copy;
     }
 
     public void move(int nextFloor) {

@@ -2,13 +2,14 @@ package com.elevator.view;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Frame;
 import java.awt.GridLayout;
-import java.util.ArrayList;
-import java.util.List;
+import java.awt.Toolkit;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -24,6 +25,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JTextArea;
+import javax.swing.JWindow;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
@@ -31,13 +33,14 @@ import javax.swing.Timer;
 import com.elevator.controller.ElevatorController;
 import com.elevator.model.Building;
 import com.elevator.model.Elevator;
+import com.elevator.model.MyList;
 import com.elevator.model.Person;
 import com.elevator.model.SimulationConfig;
 
 public class ElevatorGUI extends JFrame {
     private Building building;
     private ElevatorController controller;
-    private List<ElevatorPanel> elevatorPanels;
+    private MyList<ElevatorPanel> elevatorPanels;
     private JPanel controlPanel;
     private JPanel statusPanel;
     private Timer simulationTimer;
@@ -46,7 +49,7 @@ public class ElevatorGUI extends JFrame {
     public ElevatorGUI(Building building, ElevatorController controller) {
         this.building = building;
         this.controller = controller;
-        this.elevatorPanels = new ArrayList<>();
+        this.elevatorPanels = new MyList<>();
 
         setTitle("Simulador de Elevador Inteligente");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -61,6 +64,7 @@ public class ElevatorGUI extends JFrame {
         // Painel principal dos elevadores
         JPanel elevatorPanel = new JPanel(new GridLayout(1, building.getElevators().size(), 10, 0));
         elevatorPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        elevatorPanel.setBackground(new Color(240, 240, 240));
 
         for (Elevator elevator : building.getElevators()) {
             ElevatorPanel panel = new ElevatorPanel(elevator, building.getNumberOfFloors());
@@ -74,61 +78,130 @@ public class ElevatorGUI extends JFrame {
         // Painel de status
         statusPanel = createStatusPanel();
 
+        // Painel de configuração dos painéis externos
+        JPanel externalPanelConfig = createExternalPanelConfig();
+
         // Adiciona os painéis ao frame
         add(elevatorPanel, BorderLayout.CENTER);
         add(controlPanel, BorderLayout.EAST);
         add(statusPanel, BorderLayout.SOUTH);
+        add(externalPanelConfig, BorderLayout.WEST);
+
+        // Configura o tamanho mínimo da janela
+        setMinimumSize(new Dimension(800, 600));
     }
 
     private JPanel createControlPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(BorderFactory.createTitledBorder("Controles"));
+        panel.setBackground(new Color(240, 240, 240));
+
+        // Estilo comum para botões
+        Dimension buttonSize = new Dimension(200, 30);
+        Font buttonFont = new Font("Arial", Font.BOLD, 12);
 
         // Botão para adicionar pessoa
-        JButton addPersonButton = new JButton("Adicionar Pessoa");
+        JButton addPersonButton = createStyledButton("Adicionar Pessoa", buttonSize, buttonFont);
         addPersonButton.addActionListener(e -> showAddPersonDialog());
         panel.add(addPersonButton);
         panel.add(Box.createVerticalStrut(10));
 
         // Botão para processar requisições
-        JButton processButton = new JButton("Processar Requisições");
+        JButton processButton = createStyledButton("Processar Requisições", buttonSize, buttonFont);
         processButton.addActionListener(e -> processRequests());
         panel.add(processButton);
         panel.add(Box.createVerticalStrut(10));
 
         // Botão para alternar horário de pico
-        JButton peakHourButton = new JButton("Alternar Horário de Pico");
+        JButton peakHourButton = createStyledButton("Alternar Horário de Pico", buttonSize, buttonFont);
         peakHourButton.addActionListener(e -> togglePeakHour());
         panel.add(peakHourButton);
         panel.add(Box.createVerticalStrut(10));
 
         // Botão para mostrar relatório
-        JButton reportButton = new JButton("Mostrar Relatório");
+        JButton reportButton = createStyledButton("Mostrar Relatório", buttonSize, buttonFont);
         reportButton.addActionListener(e -> showReport());
         panel.add(reportButton);
         panel.add(Box.createVerticalStrut(10));
 
         // Botão para configurações
-        JButton configButton = new JButton("Configurações");
+        JButton configButton = createStyledButton("Configurações", buttonSize, buttonFont);
         configButton.addActionListener(e -> showConfigDialog());
         panel.add(configButton);
         panel.add(Box.createVerticalStrut(10));
 
         // ComboBox para selecionar modelo de controle
         JComboBox<ElevatorController.ControlModel> modelComboBox = new JComboBox<>(ElevatorController.ControlModel.values());
+        modelComboBox.setFont(buttonFont);
+        modelComboBox.setPreferredSize(buttonSize);
+        modelComboBox.setMaximumSize(buttonSize);
         modelComboBox.addActionListener(e -> {
             ElevatorController.ControlModel selectedModel = (ElevatorController.ControlModel) modelComboBox.getSelectedItem();
             controller.setControlModel(selectedModel);
-            JOptionPane.showMessageDialog(this, 
-                "Modelo de controle alterado para: " + selectedModel,
-                "Modelo Alterado",
-                JOptionPane.INFORMATION_MESSAGE);
+            showNotification("Modelo de controle alterado para: " + selectedModel);
         });
-        panel.add(new JLabel("Modelo de Controle:"));
+
+        JLabel modelLabel = new JLabel("Modelo de Controle:");
+        modelLabel.setFont(buttonFont);
+        panel.add(modelLabel);
         panel.add(modelComboBox);
 
         return panel;
+    }
+
+    private JButton createStyledButton(String text, Dimension size, Font font) {
+        JButton button = new JButton(text);
+        button.setFont(font);
+        button.setPreferredSize(size);
+        button.setMaximumSize(size);
+        button.setBackground(new Color(70, 130, 180));
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setBorderPainted(true);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        
+        // Efeito hover
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(new Color(100, 149, 237));
+            }
+
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(new Color(70, 130, 180));
+            }
+        });
+        
+        return button;
+    }
+
+    private void showNotification(String message) {
+        JWindow notification = new JWindow();
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(new Color(70, 130, 180));
+        
+        JLabel label = new JLabel(message);
+        label.setFont(new Font("Arial", Font.BOLD, 12));
+        label.setForeground(Color.WHITE);
+        label.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        panel.add(label, BorderLayout.CENTER);
+        notification.setContentPane(panel);
+        notification.pack();
+        
+        // Posiciona a notificação no canto superior direito
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        notification.setLocation(
+            screenSize.width - notification.getWidth() - 20,
+            20
+        );
+        
+        notification.setVisible(true);
+        
+        // Fecha a notificação após 3 segundos
+        Timer timer = new Timer(3000, e -> notification.dispose());
+        timer.setRepeats(false);
+        timer.start();
     }
 
     private JPanel createStatusPanel() {
@@ -311,8 +384,11 @@ public class ElevatorGUI extends JFrame {
                 this.building = newBuilding;
                 this.controller = new ElevatorController(newBuilding, controller.getCurrentModel());
                 
-                // Recria os painéis dos elevadores
+                // Recria os painéis dos elevadores e atualiza a interface
                 recreateElevatorPanels();
+                
+                // Atualiza o painel de status
+                updateStatusPanel();
             }
             
             // Atualiza as configurações de tempo e energia
@@ -356,6 +432,7 @@ public class ElevatorGUI extends JFrame {
         // Cria novos painéis
         JPanel elevatorPanel = new JPanel(new GridLayout(1, building.getElevators().size(), 10, 0));
         elevatorPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        elevatorPanel.setBackground(new Color(240, 240, 240));
         
         for (Elevator elevator : building.getElevators()) {
             ElevatorPanel panel = new ElevatorPanel(elevator, building.getNumberOfFloors());
@@ -365,6 +442,14 @@ public class ElevatorGUI extends JFrame {
         
         // Atualiza o layout
         add(elevatorPanel, BorderLayout.CENTER);
+        
+        // Atualiza os painéis externos
+        updateExternalPanels(ExternalPanel.PanelType.BOTAO_UNICO);
+        
+        // Atualiza o painel de configuração
+        JPanel externalPanelConfig = createExternalPanelConfig();
+        add(externalPanelConfig, BorderLayout.WEST);
+        
         revalidate();
         repaint();
     }
@@ -387,19 +472,37 @@ public class ElevatorGUI extends JFrame {
     private class ElevatorPanel extends JPanel {
         private Elevator elevator;
         private int numberOfFloors;
-        private List<JLabel> floorLabels;
+        private MyList<JLabel> floorLabels;
+        private JLabel statusLabel;
+        private JLabel directionLabel;
 
         public ElevatorPanel(Elevator elevator, int numberOfFloors) {
             this.elevator = elevator;
             this.numberOfFloors = numberOfFloors;
-            this.floorLabels = new ArrayList<>();
+            this.floorLabels = new MyList<>();
 
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
             setBorder(BorderFactory.createTitledBorder("Elevador " + elevator.getId()));
+            setBackground(new Color(240, 240, 240));
+
+            // Painel de status do elevador
+            JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            statusPanel.setBackground(new Color(240, 240, 240));
+            
+            statusLabel = new JLabel("Status: Parado");
+            directionLabel = new JLabel("Direção: -");
+            statusLabel.setFont(new Font("Arial", Font.BOLD, 12));
+            directionLabel.setFont(new Font("Arial", Font.BOLD, 12));
+            
+            statusPanel.add(statusLabel);
+            statusPanel.add(Box.createHorizontalStrut(20));
+            statusPanel.add(directionLabel);
+            add(statusPanel);
 
             // Cria labels para cada andar
             for (int i = numberOfFloors; i >= 1; i--) {
                 JLabel floorLabel = new JLabel(String.format("Andar %d: ", i));
+                floorLabel.setFont(new Font("Arial", Font.PLAIN, 12));
                 floorLabels.add(floorLabel);
                 add(floorLabel);
             }
@@ -409,25 +512,109 @@ public class ElevatorGUI extends JFrame {
 
         public void updateElevatorStatus() {
             int currentFloor = elevator.getCurrentFloor();
-            String direction = elevator.getDirection().toString();
+            String direction = translateDirection(elevator.getDirection());
             int passengers = elevator.getPassengers().size();
             boolean isMoving = elevator.isMoving();
+
+            // Atualiza os labels de status
+            statusLabel.setText("Status: " + (isMoving ? "MOVENDO" : "PARADO"));
+            directionLabel.setText("Direção: " + direction);
+            
+            // Atualiza a cor dos labels de status
+            statusLabel.setForeground(isMoving ? new Color(70, 130, 180) : Color.BLACK);
+            directionLabel.setForeground(isMoving ? new Color(70, 130, 180) : Color.BLACK);
 
             for (int i = 0; i < numberOfFloors; i++) {
                 int floor = numberOfFloors - i;
                 JLabel label = floorLabels.get(i);
                 
                 if (floor == currentFloor) {
-                    String status = isMoving ? "MOVENDO" : "PARADO";
                     label.setText(String.format("Andar %d: [%s] %s - %d passageiros", 
-                        floor, direction, status, passengers));
-                    label.setForeground(isMoving ? Color.BLUE : Color.RED);
+                        floor, direction, isMoving ? "MOVENDO" : "PARADO", passengers));
+                    label.setForeground(isMoving ? new Color(70, 130, 180) : Color.RED);
+                    label.setFont(new Font("Arial", Font.BOLD, 12));
                 } else {
                     label.setText(String.format("Andar %d: ", floor));
                     label.setForeground(Color.BLACK);
+                    label.setFont(new Font("Arial", Font.PLAIN, 12));
                 }
             }
         }
+
+        private String translateDirection(Elevator.Direction direction) {
+            switch (direction) {
+                case UP:
+                    return "SUBINDO";
+                case DOWN:
+                    return "DESCENDO";
+                case IDLE:
+                    return "PARADO";
+                default:
+                    return direction.toString();
+            }
+        }
+    }
+
+    private JPanel createExternalPanelConfig() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(BorderFactory.createTitledBorder("Configuração dos Painéis Externos"));
+        panel.setBackground(new Color(240, 240, 240));
+
+        // ComboBox para selecionar o tipo de painel externo
+        JComboBox<ExternalPanel.PanelType> panelTypeComboBox = new JComboBox<>(ExternalPanel.PanelType.values());
+        panelTypeComboBox.setFont(new Font("Arial", Font.BOLD, 12));
+        panelTypeComboBox.setPreferredSize(new Dimension(200, 30));
+        panelTypeComboBox.setMaximumSize(new Dimension(200, 30));
+        panelTypeComboBox.addActionListener(e -> {
+            ExternalPanel.PanelType selectedType = (ExternalPanel.PanelType) panelTypeComboBox.getSelectedItem();
+            updateExternalPanels(selectedType);
+        });
+
+        JLabel typeLabel = new JLabel("Tipo de Painel Externo:");
+        typeLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        panel.add(typeLabel);
+        panel.add(panelTypeComboBox);
+        panel.add(Box.createVerticalStrut(10));
+
+        return panel;
+    }
+
+    private void updateExternalPanels(ExternalPanel.PanelType type) {
+        // Remove os painéis externos existentes
+        for (Component comp : getContentPane().getComponents()) {
+            if (comp instanceof JPanel && comp.getName() != null && comp.getName().equals("externalPanels")) {
+                getContentPane().remove(comp);
+            }
+        }
+
+        // Cria um novo painel para os painéis externos
+        JPanel externalPanels = new JPanel(new GridLayout(building.getNumberOfFloors(), 1, 5, 5));
+        externalPanels.setName("externalPanels");
+        externalPanels.setBorder(BorderFactory.createTitledBorder("Painéis Externos"));
+
+        // Adiciona um painel externo para cada andar
+        for (int i = 1; i <= building.getNumberOfFloors(); i++) {
+            ExternalPanel panel = new ExternalPanel(building, i, type);
+            externalPanels.add(panel);
+        }
+
+        // Adiciona o novo painel ao frame
+        add(externalPanels, BorderLayout.WEST);
+        revalidate();
+        repaint();
+    }
+
+    private void updateStatusPanel() {
+        // Remove o painel de status antigo
+        remove(statusPanel);
+        
+        // Cria um novo painel de status
+        statusPanel = createStatusPanel();
+        add(statusPanel, BorderLayout.SOUTH);
+        
+        revalidate();
+        repaint();
     }
 
     public static void main(String[] args) {

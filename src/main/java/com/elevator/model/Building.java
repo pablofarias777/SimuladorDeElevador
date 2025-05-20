@@ -1,12 +1,10 @@
 package com.elevator.model;
 
-import java.util.ArrayList;
-import java.util.List;
 
 public class Building {
     private int numberOfFloors;
-    private List<Elevator> elevators;
-    private List<WaitingQueue> floorQueues;
+    private MyList<Elevator> elevators;
+    private MyList<MyQueue<Person>> floorQueues;
     private boolean isPeakHour;
     private SimulationConfig config;
 
@@ -16,8 +14,8 @@ public class Building {
         }
         
         this.numberOfFloors = numberOfFloors;
-        this.elevators = new ArrayList<>();
-        this.floorQueues = new ArrayList<>();
+        this.elevators = new MyList<>();
+        this.floorQueues = new MyList<>();
         this.config = SimulationConfig.getInstance();
         
         // Inicializa os elevadores
@@ -27,7 +25,7 @@ public class Building {
         
         // Inicializa as filas de espera para cada andar
         for (int i = 0; i < numberOfFloors; i++) {
-            floorQueues.add(new WaitingQueue());
+            floorQueues.add(new MyQueue<Person>());
         }
         
         this.isPeakHour = false;
@@ -41,11 +39,15 @@ public class Building {
         return numberOfFloors;
     }
 
-    public List<Elevator> getElevators() {
-        return new ArrayList<>(elevators);
+    public MyList<Elevator> getElevators() {
+        MyList<Elevator> copy = new MyList<>();
+        for (Elevator elevator : elevators) {
+            copy.add(elevator);
+        }
+        return copy;
     }
 
-    public WaitingQueue getFloorQueue(int floor) {
+    public MyQueue<Person> getFloorQueue(int floor) {
         if (floor < 1 || floor > numberOfFloors) {
             throw new IllegalArgumentException("Andar inválido");
         }
@@ -77,9 +79,11 @@ public class Building {
     }
 
     public int getTotalWaitingPeople() {
-        return floorQueues.stream()
-                .mapToInt(WaitingQueue::size)
-                .sum();
+        int total = 0;
+        for (MyQueue<Person> queue : floorQueues) {
+            total += queue.size();
+        }
+        return total;
     }
 
     @Override
