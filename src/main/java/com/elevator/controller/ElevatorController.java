@@ -1,14 +1,7 @@
 package com.elevator.controller;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-
-import com.elevator.model.Building;
-import com.elevator.model.Elevator;
-import com.elevator.model.MyList;
-import com.elevator.model.MyQueue;
-import com.elevator.model.Person;
+import com.elevator.model.*;
+import java.util.*;
 
 public class ElevatorController {
     public enum ControlModel {
@@ -65,15 +58,54 @@ public class ElevatorController {
             return;
         }
         
-        // Inicia o movimento de todos os elevadores parados
-        for (Elevator elevator : elevators) {
-            if (!elevator.isMoving()) {
-                int targetFloor = determineTargetFloor(elevator);
-                if (targetFloor != elevator.getCurrentFloor()) {
-                    elevatorTargetFloors.put(elevator, targetFloor);
-                    elevator.setMoving(true);
-                    System.out.println("Elevador " + elevator.getId() + " iniciou movimento para andar " + targetFloor + 
-                        " (Modelo: " + currentModel + ")");
+        // Verifica se há idosos esperando
+        boolean hasElderlyWaiting = false;
+        for (int i = 1; i <= building.getNumberOfFloors(); i++) {
+            MyQueue<Person> queue = building.getFloorQueue(i);
+            MyQueue<Person> tempQueue = new MyQueue<>();
+            while (!queue.isEmpty()) {
+                Person person = queue.dequeue();
+                if (person != null) {
+                    if (person.isElderly() || person.isWheelchairUser()) {
+                        hasElderlyWaiting = true;
+                    }
+                    tempQueue.enqueue(person);
+                }
+            }
+            // Restaura a fila original
+            while (!tempQueue.isEmpty()) {
+                queue.enqueue(tempQueue.dequeue());
+            }
+            if (hasElderlyWaiting) break;
+        }
+        
+        // Se houver idosos esperando, tenta usar todos os elevadores disponíveis
+        if (hasElderlyWaiting) {
+            System.out.println("Idosos detectados - Ativando todos os elevadores disponíveis");
+            for (int i = 0; i < elevators.size(); i++) {
+                Elevator elevator = elevators.get(i);
+                if (!elevator.isMoving()) {
+                    int targetFloor = findPriorityWaitingFloor(elevator);
+                    if (targetFloor != elevator.getCurrentFloor()) {
+                        elevatorTargetFloors.put(elevator, targetFloor);
+                        elevator.setMoving(true);
+                        System.out.println("Elevador " + elevator.getId() + " iniciou movimento para andar " + targetFloor + 
+                            " (Modelo: " + currentModel + ")");
+                    }
+                }
+            }
+        } else {
+            // Se não houver idosos, usa apenas elevadores parados
+            for (int i = 0; i < elevators.size(); i++) {
+                Elevator elevator = elevators.get(i);
+                if (!elevator.isMoving()) {
+                    int targetFloor = determineTargetFloor(elevator);
+                    if (targetFloor != elevator.getCurrentFloor()) {
+                        elevatorTargetFloors.put(elevator, targetFloor);
+                        elevator.setMoving(true);
+                        System.out.println("Elevador " + elevator.getId() + " iniciou movimento para andar " + targetFloor + 
+                            " (Modelo: " + currentModel + ")");
+                    }
                 }
             }
         }
@@ -105,8 +137,33 @@ public class ElevatorController {
                     continue;
                 }
                 
-                // Determina o próximo andar alvo baseado no modelo atual
-                if (elevator.getPassengers().isEmpty()) {
+                // Verifica se há pessoas prioritárias esperando
+                int priorityFloor = findPriorityWaitingFloor(elevator);
+                if (priorityFloor != currentFloor) {
+                    targetFloor = priorityFloor;
+                    System.out.println("Elevador " + elevator.getId() + " - Redirecionando para atender pessoa prioritária no andar " + priorityFloor);
+                } else if (!elevator.getPassengers().isEmpty()) {
+                    // Se não há pessoas prioritárias esperando, verifica se há passageiros prioritários
+                    boolean hasPriorityPassenger = false;
+                    int priorityDestination = -1;
+                    
+                    for (Person passenger : elevator.getPassengers()) {
+                        if (passenger.isElderly() || passenger.isWheelchairUser()) {
+                            hasPriorityPassenger = true;
+                            priorityDestination = passenger.getDestinationFloor();
+                            break;
+                        }
+                    }
+                    
+                    if (hasPriorityPassenger) {
+                        targetFloor = priorityDestination;
+                        System.out.println("Elevador " + elevator.getId() + " - Priorizando destino do passageiro prioritário: " + priorityDestination);
+                    } else {
+                        // Se não há passageiros prioritários, usa o destino do primeiro passageiro
+                        targetFloor = elevator.getPassengers().get(0).getDestinationFloor();
+                    }
+                } else {
+                    // Se não há passageiros, determina o próximo andar baseado no modelo atual
                     switch (currentModel) {
                         case PRIMEIRO_A_CHEGAR:
                             targetFloor = findNearestWaitingFloor(elevator);
@@ -118,10 +175,8 @@ public class ElevatorController {
                             targetFloor = findMostEfficientFloor(elevator);
                             break;
                     }
-                } else {
-                    // Se há passageiros, vai para o destino do primeiro passageiro
-                    targetFloor = elevator.getPassengers().get(0).getDestinationFloor();
                 }
+                
                 elevatorTargetFloors.put(elevator, targetFloor);
                 
                 // Calcula a próxima posição do elevador
@@ -146,6 +201,13 @@ public class ElevatorController {
 
     private int determineTargetFloor(Elevator elevator) {
         int currentFloor = elevator.getCurrentFloor();
+        
+        // Primeiro, verifica se há pessoas prioritárias esperando
+        int priorityFloor = findPriorityWaitingFloor(elevator);
+        if (priorityFloor != currentFloor) {
+            System.out.println("Elevador " + elevator.getId() + " - Pessoa prioritária detectada no andar " + priorityFloor);
+            return priorityFloor;
+        }
         
         // Se há pessoas no andar atual, processa primeiro
         if (!building.getFloorQueue(currentFloor).isEmpty()) {
@@ -217,25 +279,44 @@ public class ElevatorController {
             if (!queue.isEmpty()) {
                 long totalWaitTime = 0;
                 int personCount = 0;
+                boolean hasElderly = false;
                 
-                // Calcula o tempo médio de espera das pessoas na fila
-                Person person = queue.peek();
-                while (person != null) {
-                    totalWaitTime += person.getWaitingTime();
-                    personCount++;
-                    person = queue.dequeue();
-                    queue.enqueue(person);
+                // Verifica se há idosos na fila
+                MyQueue<Person> tempQueue = new MyQueue<>();
+                while (!queue.isEmpty()) {
+                    Person person = queue.dequeue();
+                    if (person != null) {
+                        if (person.isElderly()) {
+                            hasElderly = true;
+                        }
+                        totalWaitTime += person.getWaitingTime();
+                        personCount++;
+                        tempQueue.enqueue(person);
+                    }
                 }
                 
-                long avgWaitTime = totalWaitTime / personCount;
+                // Restaura a fila original
+                while (!tempQueue.isEmpty()) {
+                    queue.enqueue(tempQueue.dequeue());
+                }
                 
-                // Considera também a distância do elevador
-                int distance = Math.abs(i - currentFloor);
-                long adjustedWaitTime = avgWaitTime - (distance * 1000); // Reduz o tempo de espera baseado na distância
+                // Se houver idosos, prioriza este andar
+                if (hasElderly) {
+                    System.out.println("Andar " + i + " tem idosos esperando - priorizando atendimento");
+                    return i;
+                }
                 
-                if (adjustedWaitTime > maxWaitTime) {
-                    maxWaitTime = adjustedWaitTime;
-                    targetFloor = i;
+                if (personCount > 0) {
+                    long avgWaitTime = totalWaitTime / personCount;
+                    
+                    // Considera também a distância do elevador
+                    int distance = Math.abs(i - currentFloor);
+                    long adjustedWaitTime = avgWaitTime - (distance * 1000); // Reduz o tempo de espera baseado na distância
+                    
+                    if (adjustedWaitTime > maxWaitTime) {
+                        maxWaitTime = adjustedWaitTime;
+                        targetFloor = i;
+                    }
                 }
             }
         }
@@ -253,21 +334,29 @@ public class ElevatorController {
         for (int i = 1; i <= building.getNumberOfFloors(); i++) {
             MyQueue<Person> queue = building.getFloorQueue(i);
             if (!queue.isEmpty()) {
-                // Calcula o custo de energia considerando vários fatores
-                double energyCost = calculateEnergyCost(elevator, i);
-                
-                // Ajusta o custo baseado no número de pessoas esperando
-                int waitingPeople = queue.size();
-                energyCost = energyCost / (1 + (waitingPeople * 0.2)); // Reduz o custo se houver mais pessoas
-                
-                // Ajusta o custo baseado no horário de pico
-                if (building.isPeakHour()) {
-                    energyCost *= 0.8; // Reduz o custo durante horário de pico para priorizar atendimento
-                }
-                
-                if (energyCost < minEnergyCost) {
-                    minEnergyCost = energyCost;
-                    targetFloor = i;
+                try {
+                    // Calcula o custo de energia considerando vários fatores
+                    double energyCost = calculateEnergyCost(elevator, i);
+                    
+                    // Ajusta o custo baseado no número de pessoas esperando
+                    int waitingPeople = queue.size();
+                    if (waitingPeople > 0) {
+                        energyCost = energyCost / (1 + (waitingPeople * 0.2)); // Reduz o custo se houver mais pessoas
+                    }
+                    
+                    // Ajusta o custo baseado no horário de pico
+                    if (building.isPeakHour()) {
+                        energyCost *= 0.8; // Reduz o custo durante horário de pico para priorizar atendimento
+                    }
+                    
+                    // Verifica se o custo é válido
+                    if (!Double.isNaN(energyCost) && !Double.isInfinite(energyCost) && energyCost < minEnergyCost) {
+                        minEnergyCost = energyCost;
+                        targetFloor = i;
+                    }
+                } catch (Exception e) {
+                    System.err.println("Erro ao calcular custo de energia para andar " + i + ": " + e.getMessage());
+                    continue;
                 }
             }
         }
@@ -278,37 +367,87 @@ public class ElevatorController {
     }
 
     private double calculateEnergyCost(Elevator elevator, int targetFloor) {
-        int distance = Math.abs(targetFloor - elevator.getCurrentFloor());
-        int passengers = elevator.getPassengers().size();
-        
-        // Custo base por andar
-        double baseCost = distance * 0.1;
-        
-        // Fator de passageiros (aumenta o consumo com mais passageiros)
-        double passengerFactor = 1.0 + (passengers * 0.1);
-        
-        // Fator de horário de pico
-        double timeFactor = building.isPeakHour() ? 1.2 : 1.0;
-        
-        // Fator de direção (economia ao manter a mesma direção)
-        double directionFactor = 1.0;
-        if (elevator.getDirection() != Elevator.Direction.IDLE) {
-            boolean sameDirection = (elevator.getDirection() == Elevator.Direction.UP && targetFloor > elevator.getCurrentFloor()) ||
-                                  (elevator.getDirection() == Elevator.Direction.DOWN && targetFloor < elevator.getCurrentFloor());
-            directionFactor = sameDirection ? 0.8 : 1.2;
+        try {
+            int distance = Math.abs(targetFloor - elevator.getCurrentFloor());
+            int passengers = elevator.getPassengers().size();
+            
+            // Custo base por andar (mínimo 0.1)
+            double baseCost = Math.max(0.1, distance * 0.1);
+            
+            // Fator de passageiros (aumenta o consumo com mais passageiros)
+            double passengerFactor = 1.0 + (passengers * 0.1);
+            
+            // Fator de horário de pico
+            double timeFactor = building.isPeakHour() ? 1.2 : 1.0;
+            
+            // Fator de direção (economia ao manter a mesma direção)
+            double directionFactor = 1.0;
+            if (elevator.getDirection() != Elevator.Direction.IDLE) {
+                boolean sameDirection = (elevator.getDirection() == Elevator.Direction.UP && targetFloor > elevator.getCurrentFloor()) ||
+                                      (elevator.getDirection() == Elevator.Direction.DOWN && targetFloor < elevator.getCurrentFloor());
+                directionFactor = sameDirection ? 0.8 : 1.2;
+            }
+            
+            return baseCost * passengerFactor * timeFactor * directionFactor;
+        } catch (Exception e) {
+            System.err.println("Erro ao calcular custo de energia: " + e.getMessage());
+            return Double.MAX_VALUE; // Retorna um valor alto para evitar seleção deste andar
         }
-        
-        return baseCost * passengerFactor * timeFactor * directionFactor;
     }
 
     private void processFloorQueue(Elevator elevator, int floor) {
         MyQueue<Person> queue = building.getFloorQueue(floor);
-        while (!queue.isEmpty() && !elevator.isFull()) {
+        MyQueue<Person> priorityQueue = new MyQueue<>();
+        MyQueue<Person> normalQueue = new MyQueue<>();
+        
+        // Separa passageiros por prioridade
+        while (!queue.isEmpty()) {
             Person person = queue.dequeue();
             if (person != null) {
+                if (person.isElderly() || person.isWheelchairUser()) {
+                    priorityQueue.enqueue(person);
+                } else {
+                    normalQueue.enqueue(person);
+                }
+            }
+        }
+        
+        // Se há pessoas prioritárias esperando, verifica se o elevador tem espaço
+        if (!priorityQueue.isEmpty()) {
+            // Se o elevador está cheio, desembarca passageiros não prioritários
+            while (!elevator.getPassengers().isEmpty() && !elevator.isFull()) {
+                Person passenger = elevator.getPassengers().get(0);
+                if (!passenger.isElderly() && !passenger.isWheelchairUser()) {
+                    elevator.removePassenger(passenger);
+                    normalQueue.enqueue(passenger);
+                    System.out.println("Pessoa " + passenger.getId() + " desembarcou para dar lugar a pessoa prioritária");
+                } else {
+                    break;
+                }
+            }
+        }
+        
+        // Primeiro embarca passageiros prioritários
+        while (!priorityQueue.isEmpty()) {
+            Person person = priorityQueue.dequeue();
+            if (!elevator.isFull()) {
+                elevator.addPassenger(person);
+                System.out.println("Pessoa prioritária " + person.getId() + " embarcou no elevador " + elevator.getId() + 
+                    " (destino: " + person.getDestinationFloor() + ")");
+            } else {
+                queue.enqueue(person);
+            }
+        }
+        
+        // Depois embarca passageiros normais
+        while (!normalQueue.isEmpty()) {
+            Person person = normalQueue.dequeue();
+            if (!elevator.isFull()) {
                 elevator.addPassenger(person);
                 System.out.println("Pessoa " + person.getId() + " embarcou no elevador " + elevator.getId() + 
                     " (destino: " + person.getDestinationFloor() + ")");
+            } else {
+                queue.enqueue(person);
             }
         }
     }
@@ -334,5 +473,86 @@ public class ElevatorController {
             }
         }
         return false;
+    }
+
+    private int findPriorityWaitingFloor(Elevator elevator) {
+        int currentFloor = elevator.getCurrentFloor();
+        int nearestPriorityFloor = currentFloor;
+        int minDistance = Integer.MAX_VALUE;
+
+        // Primeiro procura por idosos/cadeirantes no sentido atual do elevador
+        Elevator.Direction currentDirection = elevator.getDirection();
+        if (currentDirection != Elevator.Direction.IDLE) {
+            for (int i = 1; i <= building.getNumberOfFloors(); i++) {
+                // Verifica apenas andares no sentido atual do elevador
+                if ((currentDirection == Elevator.Direction.UP && i > currentFloor) ||
+                    (currentDirection == Elevator.Direction.DOWN && i < currentFloor)) {
+                    MyQueue<Person> queue = building.getFloorQueue(i);
+                    if (!queue.isEmpty()) {
+                        MyQueue<Person> tempQueue = new MyQueue<>();
+                        boolean hasPriority = false;
+                        
+                        while (!queue.isEmpty()) {
+                            Person person = queue.dequeue();
+                            if (person != null) {
+                                if (person.isElderly() || person.isWheelchairUser()) {
+                                    hasPriority = true;
+                                }
+                                tempQueue.enqueue(person);
+                            }
+                        }
+                        
+                        // Restaura a fila original
+                        while (!tempQueue.isEmpty()) {
+                            queue.enqueue(tempQueue.dequeue());
+                        }
+                        
+                        if (hasPriority) {
+                            int distance = Math.abs(i - currentFloor);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                nearestPriorityFloor = i;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Se não encontrou no sentido atual, procura em todos os andares
+        if (nearestPriorityFloor == currentFloor) {
+            for (int i = 1; i <= building.getNumberOfFloors(); i++) {
+                MyQueue<Person> queue = building.getFloorQueue(i);
+                if (!queue.isEmpty()) {
+                    MyQueue<Person> tempQueue = new MyQueue<>();
+                    boolean hasPriority = false;
+                    
+                    while (!queue.isEmpty()) {
+                        Person person = queue.dequeue();
+                        if (person != null) {
+                            if (person.isElderly() || person.isWheelchairUser()) {
+                                hasPriority = true;
+                            }
+                            tempQueue.enqueue(person);
+                        }
+                    }
+                    
+                    // Restaura a fila original
+                    while (!tempQueue.isEmpty()) {
+                        queue.enqueue(tempQueue.dequeue());
+                    }
+                    
+                    if (hasPriority) {
+                        int distance = Math.abs(i - currentFloor);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            nearestPriorityFloor = i;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return nearestPriorityFloor;
     }
 } 

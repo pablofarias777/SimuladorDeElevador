@@ -29,7 +29,7 @@ Este projeto implementa um simulador de elevadores inteligentes em um prédio, o
    ```
 4. Execute o simulador:
    ```
-   java -cp target/elevator-simulator-1.0-SNAPSHOT.jar com.elevator.ElevatorSimulator
+  java -cp target/classes com.elevator.view.ElevatorGUI
    ```
 
 ## Uso
